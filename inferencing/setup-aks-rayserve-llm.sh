@@ -235,7 +235,26 @@ kubectl wait --for=condition=Available --timeout=600s rayservice/ray-serve-llm |
 # -----------------------------------------------------------------------------
 echo "==> Creating LoadBalancer services for external access..."
 
+# Wait for RayCluster to be created and get the actual cluster name
+# KubeRay adds a random suffix to cluster names (e.g., ray-serve-llm-xznmx)
+echo "==> Waiting for RayCluster to be created..."
+for i in {1..60}; do
+    RAY_CLUSTER_NAME=$(kubectl get raycluster -l ray.io/served-by=ray-serve-llm -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [[ -n "$RAY_CLUSTER_NAME" ]]; then
+        echo "==> Found RayCluster: $RAY_CLUSTER_NAME"
+        break
+    fi
+    echo "==> Waiting for RayCluster... (attempt $i/60)"
+    sleep 5
+done
+
+if [[ -z "$RAY_CLUSTER_NAME" ]]; then
+    echo "==> ERROR: RayCluster not found after 5 minutes. Using fallback selector."
+    RAY_CLUSTER_NAME="ray-serve-llm"
+fi
+
 # Create LoadBalancer service for Ray Serve inference endpoint (port 80 -> 8000)
+# Uses the same selector as the internal ray-serve-llm-serve-svc service
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Service
@@ -247,7 +266,7 @@ spec:
   type: LoadBalancer
   selector:
     ray.io/serve: "true"
-    ray.io/cluster: ray-serve-llm-raycluster
+    ray.io/cluster: ${RAY_CLUSTER_NAME}
   ports:
   - name: serve
     port: 80
@@ -267,7 +286,7 @@ spec:
   type: LoadBalancer
   selector:
     ray.io/node-type: head
-    ray.io/cluster: ray-serve-llm-raycluster
+    ray.io/cluster: ${RAY_CLUSTER_NAME}
   ports:
   - name: dashboard
     port: 80
@@ -307,7 +326,7 @@ echo "# Check Ray Service status:"
 echo "kubectl get rayservice ray-serve-llm"
 echo ""
 echo "# Check pods:"
-echo "kubectl get pods -l ray.io/cluster=ray-serve-llm-raycluster"
+echo "kubectl get pods -l ray.io/cluster=${RAY_CLUSTER_NAME}"
 echo ""
 echo "# Check LoadBalancer IPs:"
 echo "kubectl get svc ray-serve-llm-serve-lb ray-serve-llm-dashboard-lb"

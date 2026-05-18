@@ -16,7 +16,6 @@ spec:
           engine_kwargs:
             dtype: bfloat16
             max_model_len: 1024
-            device: auto
             gpu_memory_utilization: 0.75
           deployment_config:
             autoscaling_config:
@@ -68,6 +67,13 @@ spec:
         num-gpus: "4"
       template:
         spec:
+          nodeSelector:
+            nvidia.com/gpu.present: "true"
+          tolerations:
+          - key: "sku"
+            operator: "Equal"
+            value: "gpu"
+            effect: "NoSchedule"
           containers:
           - name: ray-worker
             image: rayproject/ray-llm:2.52.0-py311-cu128
