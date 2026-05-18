@@ -53,8 +53,34 @@ else
         --sku automatic
 fi
 
+# Wait for cluster provisioning to complete (check provisioningState = Succeeded)
+echo "==> Waiting for cluster provisioning to complete..."
+while true; do
+    STATE=$(az aks show --resource-group "$RESOURCE_GROUP" --name "$CLUSTER_NAME" --query "provisioningState" -o tsv 2>/dev/null)
+    if [[ "$STATE" == "Failed" ]]; then
+        echo "==> ERROR: Cluster provisioning failed. Exiting..."
+        exit 1
+    fi
+    if [[ "$STATE" == "Succeeded" ]]; then
+        # Double-check no in-progress operations by waiting a few seconds
+        sleep 10
+        STATE=$(az aks show --resource-group "$RESOURCE_GROUP" --name "$CLUSTER_NAME" --query "provisioningState" -o tsv 2>/dev/null)
+        if [[ "$STATE" == "Succeeded" ]]; then
+            echo "==> Cluster provisioning completed."
+            break
+        fi
+    fi
+    echo "==> Cluster provisioning state: $STATE. Waiting..."
+    sleep 30
+done
+
 # -----------------------------------------------------------------------------
 # Step 4: Add GPU Workload Node Pool (if not exists)
+# -----------------------------------------------------------------------------
+# TODO: With AKS Automatic clusters, we will leverage Node Auto-Provisioning (NAP)
+# instead of regular static node pools. NAP automatically provisions nodes
+# based on workload requirements. This GPU node pool configuration tells NAP
+# to provision A100 GPU nodes when Ray Serve inferencing workloads are scheduled.
 # -----------------------------------------------------------------------------
 if az aks nodepool show --resource-group "$RESOURCE_GROUP" --cluster-name "$CLUSTER_NAME" --name workload &>/dev/null; then
     echo "==> Node pool 'workload' already exists, skipping..."
