@@ -117,7 +117,7 @@ kubectl wait --for=condition=Available --timeout=600s rayservice/ray-serve-llm |
 # -----------------------------------------------------------------------------
 echo "==> Creating LoadBalancer services for external access..."
 
-# Create LoadBalancer service for Ray Serve inference endpoint (port 8000)
+# Create LoadBalancer service for Ray Serve inference endpoint (port 80 -> 8000)
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Service
@@ -132,12 +132,12 @@ spec:
     ray.io/cluster: ray-serve-llm-raycluster
   ports:
   - name: serve
-    port: 8000
+    port: 80
     targetPort: 8000
     protocol: TCP
 EOF
 
-# Create LoadBalancer service for Ray Dashboard (port 8265)
+# Create LoadBalancer service for Ray Dashboard (port 80 -> 8265)
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Service
@@ -152,7 +152,7 @@ spec:
     ray.io/cluster: ray-serve-llm-raycluster
   ports:
   - name: dashboard
-    port: 8265
+    port: 80
     targetPort: 8265
     protocol: TCP
 EOF
@@ -171,14 +171,14 @@ echo ""
 
 # Get Serve endpoint IP
 SERVE_IP=$(kubectl get svc ray-serve-llm-serve-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
-echo "Ray Serve Inference Endpoint: http://${SERVE_IP}:8000"
-echo "  - OpenAI-compatible API: http://${SERVE_IP}:8000/v1/chat/completions"
-echo "  - Models endpoint: http://${SERVE_IP}:8000/v1/models"
+echo "Ray Serve Inference Endpoint: http://${SERVE_IP}"
+echo "  - OpenAI-compatible API: http://${SERVE_IP}/v1/chat/completions"
+echo "  - Models endpoint: http://${SERVE_IP}/v1/models"
 
 # Get Dashboard IP
 DASHBOARD_IP=$(kubectl get svc ray-serve-llm-dashboard-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
 echo ""
-echo "Ray Dashboard: http://${DASHBOARD_IP}:8265"
+echo "Ray Dashboard: http://${DASHBOARD_IP}"
 
 echo ""
 echo "============================================================================="
@@ -195,7 +195,7 @@ echo "# Check LoadBalancer IPs:"
 echo "kubectl get svc ray-serve-llm-serve-lb ray-serve-llm-dashboard-lb"
 echo ""
 echo "# Test inference (replace IP with actual serve endpoint IP):"
-echo 'curl -X POST http://<SERVE_IP>:8000/v1/chat/completions \'
+echo 'curl -X POST http://<SERVE_IP>/v1/chat/completions \'
 echo '  -H "Content-Type: application/json" \'
 echo '  -d '"'"'{"model": "qwen2.5-7b-instruct", "messages": [{"role": "user", "content": "Hello!"}]}'"'"
 echo ""
