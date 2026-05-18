@@ -26,7 +26,7 @@ RESOURCE_GROUP="chengliangli-rg"
 CLUSTER_NAME="chengliangli-auto"
 LOCATION="italynorth"
 GPU_VM_SIZE="Standard_ND96amsr_A100_v4"  # A100 GPU optimized for AI workloads
-HF_TOKEN="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"  # Hugging Face API token
+HF_TOKEN="your-huggingface-token"  # Hugging Face API token
 
 # -----------------------------------------------------------------------------
 # Step 1: Set Azure Subscription
@@ -177,11 +177,20 @@ helm $HELM_CMD gpu-operator nvidia/gpu-operator \
 
 # Remove k8s-driver-manager init container from driver daemonset
 # This init container tries to modify node labels which AKS blocks
+echo "==> Patching ClusterPolicy to disable driver auto-upgrade..."
+sleep 10  # Wait for ClusterPolicy to be created
+# Disable driver upgradePolicy to prevent AKS admission webhook conflicts
+kubectl patch clusterpolicy cluster-policy --type='json' \
+    -p='[{"op": "add", "path": "/spec/driver/upgradePolicy", "value": {"autoUpgrade": false}}]' 2>/dev/null || true
+
 echo "==> Patching nvidia-driver-daemonset to remove init containers..."
-sleep 10  # Wait for daemonset to be created
+sleep 5  # Wait for daemonset to be created
 kubectl patch daemonset nvidia-driver-daemonset -n kube-system \
     --type='json' \
     -p='[{"op": "remove", "path": "/spec/template/spec/initContainers"}]' 2>/dev/null || true
+
+# Delete any existing crashed driver pods to trigger recreation with new config
+kubectl delete pods -n kube-system -l app=nvidia-driver-daemonset 2>/dev/null || true
 
 # Wait for GPU driver to be installed
 echo "==> Waiting for NVIDIA driver installation (this may take 5-10 minutes)..."
