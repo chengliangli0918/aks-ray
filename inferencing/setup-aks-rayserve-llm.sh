@@ -19,6 +19,7 @@ RESOURCE_GROUP="chengliangli-rg"
 CLUSTER_NAME="chengliangli-auto"
 LOCATION="italynorth"
 GPU_VM_SIZE="Standard_ND96amsr_A100_v4"  # A100 GPU optimized for AI workloads
+HF_TOKEN="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"  # Hugging Face API token
 
 # -----------------------------------------------------------------------------
 # Step 1: Set Azure Subscription
@@ -95,7 +96,15 @@ echo "==> Waiting for KubeRay operator to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/kuberay-operator -n kuberay-system
 
 # -----------------------------------------------------------------------------
-# Step 7: Deploy Ray Service for LLM Inference
+# Step 7: Create Hugging Face Token Secret
+# -----------------------------------------------------------------------------
+echo "==> Creating Hugging Face token secret..."
+kubectl create secret generic hf-token \
+    --from-literal=hf_token="$HF_TOKEN" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+# -----------------------------------------------------------------------------
+# Step 8: Deploy Ray Service for LLM Inference
 # -----------------------------------------------------------------------------
 echo "==> Deploying Ray Service for LLM inference..."
 kubectl apply -f ray-service.llm-serve.yaml
@@ -104,7 +113,7 @@ echo "==> Waiting for Ray Service to be ready..."
 kubectl wait --for=condition=Available --timeout=600s rayservice/ray-serve-llm || true
 
 # -----------------------------------------------------------------------------
-# Step 8: Create LoadBalancer Services for External Access
+# Step 9: Create LoadBalancer Services for External Access
 # -----------------------------------------------------------------------------
 echo "==> Creating LoadBalancer services for external access..."
 
@@ -149,7 +158,7 @@ spec:
 EOF
 
 # -----------------------------------------------------------------------------
-# Step 9: Wait for LoadBalancer IPs and Display Access Information
+# Step 10: Wait for LoadBalancer IPs and Display Access Information
 # -----------------------------------------------------------------------------
 echo "==> Waiting for LoadBalancer IPs to be assigned..."
 sleep 30
