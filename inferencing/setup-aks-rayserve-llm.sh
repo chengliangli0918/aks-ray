@@ -3,8 +3,15 @@
 # =============================================================================
 # AKS Ray Serve LLM Inferencing Setup Script
 # =============================================================================
-# This script creates an AKS automatic cluster with GPU nodes for Ray Serve
+# This script creates an AKS Automatic cluster with GPU nodes for Ray Serve
 # LLM inferencing workloads.
+#
+# Key features:
+# - Creates AKS Automatic cluster with GPU node pool (A100 GPUs)
+# - Skips AKS built-in GPU driver and uses NVIDIA GPU Operator instead
+# - Installs GPU Operator in kube-system (exempted from AKS security policies)
+# - Installs KubeRay operator for Ray cluster management
+# - Deploys Ray Serve for LLM inference
 #
 # Reference: https://docs.ray.io/en/latest/cluster/kubernetes/examples/rayserve-llm-example.html
 # =============================================================================
@@ -77,23 +84,46 @@ done
 # -----------------------------------------------------------------------------
 # Step 4: Add GPU Workload Node Pool (if not exists)
 # -----------------------------------------------------------------------------
-# TODO: With AKS Automatic clusters, we will leverage Node Auto-Provisioning (NAP)
-# instead of regular static node pools. NAP automatically provisions nodes
-# based on workload requirements. This GPU node pool configuration tells NAP
-# to provision A100 GPU nodes when Ray Serve inferencing workloads are scheduled.
+# TODO: For AKS Automatic clusters, we skip AKS's built-in GPU driver installation
+# (--gpu-driver none) and use NVIDIA GPU Operator instead. This is because:
+# 1. AKS Automatic has strict security policies that can interfere with CSE
+# 2. GPU Operator provides more flexibility and is installed in kube-system
+#    namespace which is exempted from AKS Automatic security policies
 # -----------------------------------------------------------------------------
 if az aks nodepool show --resource-group "$RESOURCE_GROUP" --cluster-name "$CLUSTER_NAME" --name workload &>/dev/null; then
     echo "==> Node pool 'workload' already exists, skipping..."
 else
-    echo "==> Adding GPU workload node pool with $GPU_VM_SIZE..."
+    echo "==> Adding GPU workload node pool with $GPU_VM_SIZE (skipping AKS GPU driver)..."
     az aks nodepool add \
         --resource-group "$RESOURCE_GROUP" \
         --cluster-name "$CLUSTER_NAME" \
         --name workload \
         --node-vm-size "$GPU_VM_SIZE" \
         --node-count 1 \
-        --labels workload=rayserve
+        --gpu-driver none \
+        --node-taints "sku=gpu:NoSchedule" \
+        --labels "workload=rayserve" \
+                 "feature.node.kubernetes.io/pci-10de.present=true" \
+                 "nvidia.com/gpu.present=true" \
+                 "feature.node.kubernetes.io/system-os_release.ID=ubuntu" \
+                 "feature.node.kubernetes.io/system-os_release.VERSION_ID=22.04" \
+                 "nvidia.com/gpu.deploy.driver=true" \
+                 "nvidia.com/gpu.deploy.container-toolkit=true" \
+                 "nvidia.com/gpu.deploy.device-plugin=true" \
+                 "nvidia.com/gpu.deploy.gpu-feature-discovery=true" \
+                 "nvidia.com/gpu.deploy.operator-validator=true" \
+                 "nvidia.com/gpu.deploy.dcgm-exporter=true"
 fi
+
+# Wait for node pool to be ready
+echo "==> Waiting for GPU node pool to be ready..."
+az aks nodepool wait \
+    --resource-group "$RESOURCE_GROUP" \
+    --cluster-name "$CLUSTER_NAME" \
+    --name workload \
+    --created \
+    --interval 30 \
+    --timeout 1800
 
 # -----------------------------------------------------------------------------
 # Step 5: Get AKS Credentials
@@ -105,7 +135,69 @@ az aks get-credentials \
     --overwrite-existing
 
 # -----------------------------------------------------------------------------
-# Step 6: Install KubeRay Operator
+# Step 6: Install NVIDIA GPU Operator
+# -----------------------------------------------------------------------------
+# NOTE: We install GPU Operator in kube-system namespace which is exempted from
+# AKS Automatic's baseline security policies (hostPath volumes, privileged containers).
+# We also disable NFD (Node Feature Discovery) because it requires nodes/proxy RBAC
+# which AKS blocks, and instead use manual labels added via nodepool configuration.
+# -----------------------------------------------------------------------------
+echo "==> Installing NVIDIA GPU Operator..."
+
+# Add NVIDIA Helm repository
+helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
+helm repo update nvidia
+
+# Check if GPU operator is already installed
+if helm status gpu-operator -n kube-system &>/dev/null; then
+    echo "==> GPU Operator already installed, upgrading..."
+    HELM_CMD="upgrade"
+else
+    echo "==> Installing GPU Operator in kube-system namespace..."
+    HELM_CMD="install"
+fi
+
+# Install/upgrade GPU Operator with AKS Automatic compatible settings
+helm $HELM_CMD gpu-operator nvidia/gpu-operator \
+    --namespace kube-system \
+    --set driver.enabled=true \
+    --set driver.manager.enabled=false \
+    --set toolkit.enabled=true \
+    --set devicePlugin.enabled=true \
+    --set migManager.enabled=false \
+    --set dcgmExporter.enabled=true \
+    --set nfd.enabled=false \
+    --set operator.defaultRuntime=containerd \
+    --set 'daemonsets.tolerations[0].key=sku' \
+    --set 'daemonsets.tolerations[0].operator=Equal' \
+    --set 'daemonsets.tolerations[0].value=gpu' \
+    --set 'daemonsets.tolerations[0].effect=NoSchedule' \
+    --set driver.upgradePolicy.autoUpgrade=false \
+    --wait --timeout 15m
+
+# Remove k8s-driver-manager init container from driver daemonset
+# This init container tries to modify node labels which AKS blocks
+echo "==> Patching nvidia-driver-daemonset to remove init containers..."
+sleep 10  # Wait for daemonset to be created
+kubectl patch daemonset nvidia-driver-daemonset -n kube-system \
+    --type='json' \
+    -p='[{"op": "remove", "path": "/spec/template/spec/initContainers"}]' 2>/dev/null || true
+
+# Wait for GPU driver to be installed
+echo "==> Waiting for NVIDIA driver installation (this may take 5-10 minutes)..."
+kubectl rollout status daemonset/nvidia-driver-daemonset -n kube-system --timeout=600s || true
+
+# Wait for device plugin to be ready
+echo "==> Waiting for NVIDIA device plugin..."
+kubectl rollout status daemonset/nvidia-device-plugin-daemonset -n kube-system --timeout=300s || true
+
+# Verify GPUs are available
+echo "==> Verifying GPU availability..."
+GPU_COUNT=$(kubectl get nodes -l nvidia.com/gpu.present=true -o jsonpath='{.items[*].status.capacity.nvidia\.com/gpu}' 2>/dev/null | tr ' ' '+' | bc 2>/dev/null || echo "0")
+echo "==> Total GPUs available: $GPU_COUNT"
+
+# -----------------------------------------------------------------------------
+# Step 7: Install KubeRay Operator
 # -----------------------------------------------------------------------------
 echo "==> Installing KubeRay operator..."
 helm repo add kuberay https://ray-project.github.io/kuberay-helm/
@@ -122,7 +214,7 @@ echo "==> Waiting for KubeRay operator to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/kuberay-operator -n kuberay-system
 
 # -----------------------------------------------------------------------------
-# Step 7: Create Hugging Face Token Secret
+# Step 8: Create Hugging Face Token Secret
 # -----------------------------------------------------------------------------
 echo "==> Creating Hugging Face token secret..."
 kubectl create secret generic hf-token \
@@ -130,7 +222,7 @@ kubectl create secret generic hf-token \
     --dry-run=client -o yaml | kubectl apply -f -
 
 # -----------------------------------------------------------------------------
-# Step 8: Deploy Ray Service for LLM Inference
+# Step 9: Deploy Ray Service for LLM Inference
 # -----------------------------------------------------------------------------
 echo "==> Deploying Ray Service for LLM inference..."
 kubectl apply -f ray-service.llm-serve.yaml
@@ -139,7 +231,7 @@ echo "==> Waiting for Ray Service to be ready..."
 kubectl wait --for=condition=Available --timeout=600s rayservice/ray-serve-llm || true
 
 # -----------------------------------------------------------------------------
-# Step 9: Create LoadBalancer Services for External Access
+# Step 10: Create LoadBalancer Services for External Access
 # -----------------------------------------------------------------------------
 echo "==> Creating LoadBalancer services for external access..."
 
@@ -184,7 +276,7 @@ spec:
 EOF
 
 # -----------------------------------------------------------------------------
-# Step 10: Wait for LoadBalancer IPs and Display Access Information
+# Step 11: Wait for LoadBalancer IPs and Display Access Information
 # -----------------------------------------------------------------------------
 echo "==> Waiting for LoadBalancer IPs to be assigned..."
 sleep 30
