@@ -30,17 +30,17 @@ The inferencing sample deploys a complete LLM serving stack on AKS Automatic wit
 ┌─────────────────────────────────────────────────────────────────┐
 │                     AKS Automatic Cluster                        │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌──────────────────────────────────┐    │
-│  │   System Pool   │    │        GPU Workload Pool         │    │
-│  │  (Default Node) │    │     (A100 GPU Nodes)             │    │
-│  │                 │    │                                  │    │
-│  │  ┌───────────┐  │    │  ┌────────────────────────────┐  │    │
-│  │  │Ray Head   │◄─┼────┼──│ Ray Worker (GPU)           │  │    │
-│  │  │Pod        │  │    │  │ - vLLM Engine              │  │    │
-│  │  │- Dashboard│  │    │  │ - Qwen2.5-7B Model         │  │    │
-│  │  │- GCS      │  │    │  │ - 4x A100 GPUs             │  │    │
-│  │  └───────────┘  │    │  └────────────────────────────┘  │    │
-│  └─────────────────┘    └──────────────────────────────────┘    │
+│                      GPU Workload Pool                           │
+│                    (A100 GPU Nodes)                              │
+│                  Label: accelerator=nvidia                       │
+│                                                                  │
+│  ┌────────────────────┐    ┌───────────────────────────────┐    │
+│  │ Ray Head Pod       │    │ Ray Worker Pod (GPU)          │    │
+│  │ - Dashboard (8265) │◄───│ - vLLM Engine                 │    │
+│  │ - GCS (6379)       │    │ - Qwen2.5-7B Model            │    │
+│  │ - Serve (8000)     │    │ - 4x A100 GPUs                │    │
+│  │ - 4 CPU, 8Gi RAM   │    │ - 32 CPU, 32Gi RAM            │    │
+│  └────────────────────┘    └───────────────────────────────┘    │
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  LoadBalancer Services                                   │    │
@@ -68,10 +68,12 @@ Clone the repository to your local machine, then make sure you have all the prer
 
 1. An Azure subscription. If you don't have an Azure subscription, you can create a free account [here](https://azure.microsoft.com/free/).
 2. The Azure CLI installed on your local machine. You can install the Azure CLI by following the instructions [here](https://docs.microsoft.com/cli/azure/install-azure-cli).
-3. [kubectl](https://kubernetes.io/docs/tasks/tools/) must be installed.
-4. [Helm](https://helm.sh/docs/intro/install/) must be installed.
-5. A [Hugging Face](https://huggingface.co/) account and API token for model access.
-6. Sufficient Azure GPU quota for A100 VMs in your target region.
+3. [kubelogin](https://github.com/Azure/kubelogin) must be installed for Azure RBAC authentication.
+4. [kubectl](https://kubernetes.io/docs/tasks/tools/) must be installed.
+5. [Helm](https://helm.sh/docs/intro/install/) must be installed.
+6. A [Hugging Face](https://huggingface.co/) account and API token for model access.
+7. Sufficient Azure GPU quota for A100 VMs in your target region.
+8. **Azure Kubernetes Service RBAC Cluster Admin** role assigned on the AKS cluster.
 
 ### Quickstart
 
@@ -112,9 +114,9 @@ Clone the repository to your local machine, then make sure you have all the prer
 
 ### What the Setup Script Does
 
-1. **Creates AKS Automatic Cluster** - Provisions a managed Kubernetes cluster with automatic scaling
-2. **Adds GPU Node Pool** - Deploys A100 GPU nodes with custom tolerations
-3. **Installs NVIDIA GPU Operator** - Sets up GPU drivers and device plugins (in kube-system namespace to work with AKS Automatic security policies)
+1. **Creates AKS Automatic Cluster** - Provisions a managed Kubernetes cluster with automatic scaling and Azure RBAC
+2. **Adds GPU Node Pool** - Deploys A100 GPU nodes with managed GPU driver (`--enable-managed-gpu=true`)
+3. **Gets Credentials** - Configures kubectl with kubelogin for Azure CLI authentication
 4. **Deploys KubeRay Operator** - Installs the Kubernetes operator for managing Ray clusters
 5. **Creates Ray Service** - Deploys Ray Serve with vLLM for LLM inference
 6. **Configures LoadBalancers** - Exposes inference API and Ray Dashboard externally
@@ -253,8 +255,8 @@ kubectl get pods -l ray.io/serve=true
 DASHBOARD_IP=$(kubectl get svc ray-serve-llm-dashboard-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo "Dashboard: http://${DASHBOARD_IP}"
 
-# Check GPU availability
-kubectl get nodes -l nvidia.com/gpu.present=true -o custom-columns=NAME:.metadata.name,GPUs:.status.capacity.nvidia\\.com/gpu
+# Check GPU availability (AKS Automatic uses 'accelerator=nvidia' label)
+kubectl get nodes -l accelerator=nvidia -o custom-columns=NAME:.metadata.name,GPUs:.status.capacity.nvidia\.com/gpu
 
 # View Ray head logs
 kubectl logs -l ray.io/node-type=head -c ray-head --tail=100
@@ -297,8 +299,10 @@ workerGroupSpecs:
 |-------|----------|
 | Pod not ready | Check `kubectl describe pod <pod-name>` for events |
 | LoadBalancer timeout | Verify endpoints: `kubectl get endpoints <svc-name>` |
-| GPU not detected | Ensure GPU Operator pods are running: `kubectl get pods -n kube-system -l app=nvidia-driver-daemonset` |
+| GPU not detected | Verify GPU node has label: `kubectl get nodes -l accelerator=nvidia` |
 | Model download fails | Verify HF_TOKEN secret: `kubectl get secret hf-token` |
+| RBAC permission denied | Assign **Azure Kubernetes Service RBAC Cluster Admin** role to your user |
+| Head pod CrashLoopBackOff | Increase head pod resources (4 CPU, 8Gi memory recommended) |
 
 ## Resources
 
@@ -306,7 +310,8 @@ workerGroupSpecs:
 - [KubeRay Project](https://github.com/ray-project/kuberay)
 - [Ray Serve LLM](https://docs.ray.io/en/latest/serve/llm/serving-llms.html)
 - [AKS Automatic](https://learn.microsoft.com/azure/aks/intro-aks-automatic)
-- [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html)
+- [AKS Managed GPU Driver](https://learn.microsoft.com/azure/aks/gpu-cluster)
+- [kubelogin](https://github.com/Azure/kubelogin)
 
 ## License
 
