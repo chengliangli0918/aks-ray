@@ -25,7 +25,7 @@ RESOURCE_GROUP="chengliangli-rg"
 CLUSTER_NAME="chengliangli-auto"
 LOCATION="italynorth"
 GPU_VM_SIZE="Standard_ND96amsr_A100_v4"  # A100 GPU optimized for AI workloads
-HF_TOKEN="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"  # Hugging Face API token
+HF_TOKEN=""  # Hugging Face API token
 
 # -----------------------------------------------------------------------------
 # Step 1: Set Azure Subscription
