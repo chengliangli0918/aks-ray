@@ -50,13 +50,27 @@ spec:
             - containerPort: 10001
               name: client
               protocol: TCP
+            env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: hf_token
             resources:
               limits:
-                cpu: "2"
-                memory: "5Gi"
+                cpu: "4"
+                memory: "8Gi"
               requests:
-                cpu: "2"
-                memory: "4Gi"
+                cpu: "4"
+                memory: "8Gi"
+            volumeMounts:
+            - name: shared-mem
+              mountPath: /dev/shm
+          volumes:
+          - name: shared-mem
+            emptyDir:
+              medium: Memory
+              sizeLimit: 4Gi
     workerGroupSpecs:
     - replicas: 1
       minReplicas: 1
@@ -68,12 +82,7 @@ spec:
       template:
         spec:
           nodeSelector:
-            nvidia.com/gpu.present: "true"
-          tolerations:
-          - key: "sku"
-            operator: "Equal"
-            value: "gpu"
-            effect: "NoSchedule"
+            accelerator: nvidia
           containers:
           - name: ray-worker
             image: rayproject/ray-llm:2.52.0-py311-cu128
