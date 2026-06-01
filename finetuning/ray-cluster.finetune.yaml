@@ -1,0 +1,133 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray-finetune-cluster
+  labels:
+    app: ray-finetune
+spec:
+  rayVersion: "2.52.0"
+  enableInTreeAutoscaling: true
+  autoscalerOptions:
+    upscalingMode: Default
+    idleTimeoutSeconds: 300
+    resources:
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+  headGroupSpec:
+    rayStartParams:
+      num-cpus: "0"
+      num-gpus: "0"
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        containers:
+        - name: ray-head
+          image: rayproject/ray:2.52.1-py311-cu128
+          ports:
+          - containerPort: 6379
+            name: gcs
+            protocol: TCP
+          - containerPort: 8265
+            name: dashboard
+            protocol: TCP
+          - containerPort: 10001
+            name: client
+            protocol: TCP
+          - containerPort: 8000
+            name: serve
+            protocol: TCP
+          env:
+          - name: HUGGING_FACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: hf_token
+          - name: RAY_GRAFANA_IFRAME_HOST
+            value: "http://127.0.0.1:3000"
+          - name: RAY_GRAFANA_HOST
+            value: "http://prometheus-grafana.prometheus-system.svc:80"
+          - name: RAY_PROMETHEUS_HOST
+            value: "http://prometheus-kube-prometheus-prometheus.prometheus-system.svc:9090"
+          resources:
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+          - name: shared-mem
+            mountPath: /dev/shm
+          - name: finetune-script
+            mountPath: /home/ray/scripts
+          - name: ray-logs
+            mountPath: /tmp/ray
+        volumes:
+        - name: shared-mem
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
+        - name: finetune-script
+          configMap:
+            name: finetune-script
+        - name: ray-logs
+          emptyDir: {}
+  workerGroupSpecs:
+  - replicas: 1
+    minReplicas: 1
+    maxReplicas: 4
+    groupName: gpu-workers
+    rayStartParams:
+      num-gpus: "4"
+    template:
+      spec:
+        nodeSelector:
+          accelerator: nvidia
+        tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "sku"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoSchedule"
+        containers:
+        - name: ray-worker
+          image: rayproject/ray:2.52.1-py311-cu128
+          env:
+          - name: HUGGING_FACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: hf_token
+          resources:
+            limits:
+              cpu: "48"
+              memory: "192Gi"
+              nvidia.com/gpu: "4"
+            requests:
+              cpu: "32"
+              memory: "128Gi"
+              nvidia.com/gpu: "4"
+          volumeMounts:
+          - name: shared-mem
+            mountPath: /dev/shm
+          - name: finetune-script
+            mountPath: /home/ray/scripts
+          - name: model-cache
+            mountPath: /root/.cache/huggingface
+        volumes:
+        - name: shared-mem
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: finetune-script
+          configMap:
+            name: finetune-script
+        - name: model-cache
+          emptyDir:
+            sizeLimit: 100Gi

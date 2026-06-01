@@ -1,0 +1,42 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: llm-compare-inference
+  labels:
+    app: ray-finetune
+spec:
+  clusterSelector:
+    ray.io/cluster: ray-finetune-cluster
+
+  # --adapter accepts either:
+  #   - a local LoRA adapter dir on the Ray head pod (auto-detected as PEFT)
+  #   - an HF repo id of a LoRA adapter (auto-detected)
+  #   - an HF repo id of a full merged fine-tuned model (used directly)
+  entrypoint: >-
+    python /home/ray/scripts/compare_inference.py
+    --base-model Qwen/Qwen2.5-3B
+    --adapter chengliangli/qwen2.5-3b-alpaca
+    --num-samples 20
+    --output-json /tmp/comparison.json
+
+  runtimeEnvYAML: |
+    pip:
+      - transformers>=4.45.0
+      - datasets>=2.16.0
+      - peft>=0.13.0
+      - accelerate>=0.34.0
+      - huggingface_hub>=0.25.0
+
+  submitterPodTemplate:
+    spec:
+      containers:
+      - name: job-submitter
+        image: rayproject/ray:2.52.1-py311-cu128
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+      restartPolicy: Never

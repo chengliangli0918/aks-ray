@@ -11,8 +11,8 @@ AKS Automatic simplifies Kubernetes cluster management by automating cluster set
 | Sample | Description | Status |
 |--------|-------------|--------|
 | [Inferencing](./inferencing/) | Deploy LLM inference with Ray Serve on GPU nodes | ✅ Available |
+| [Fine-tuning](./finetuning/) | LLM fine-tuning with Ray Train + Ray Tune | ✅ Available |
 | Training | Distributed model training with Ray Train | 🚧 Coming Soon |
-| Model Tuning | Hyperparameter tuning with Ray Tune | 🚧 Coming Soon |
 
 ## Inferencing Sample
 

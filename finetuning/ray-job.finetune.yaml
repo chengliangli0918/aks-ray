@@ -1,0 +1,57 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: llm-finetune-job
+  labels:
+    app: ray-finetune
+spec:
+  # Use the existing Ray cluster for fine-tuning
+  clusterSelector:
+    ray.io/cluster: ray-finetune-cluster
+  
+  # Alternatively, create a dedicated cluster for this job
+  # Uncomment below and comment out clusterSelector to use ephemeral cluster
+  # shutdownAfterJobFinishes: true
+  # ttlSecondsAfterFinished: 300
+  
+  # Single-run training with INLINE_PUSH_* envs: the train_func pushes the
+  # merged LoRA model to the HF Hub directly from the worker, bypassing Ray
+  # Tune's checkpoint persistence (which silently drops files on multi-node
+  # clusters without shared storage).
+  entrypoint: "python /home/ray/scripts/finetune_with_tune.py --single-run --gpus-per-worker 1"
+
+  # Runtime environment with required packages
+  runtimeEnvYAML: |
+    pip:
+      - transformers>=4.45.0
+      - datasets>=2.16.0
+      - peft>=0.13.0
+      - accelerate>=0.34.0
+      - bitsandbytes>=0.43.0
+      - trl>=0.11.0
+      - huggingface_hub>=0.25.0
+      - optuna>=3.6.0
+      - tensorboard
+      - evaluate
+      - scikit-learn
+    env_vars:
+      WANDB_DISABLED: "true"
+      PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb:512"
+      INLINE_PUSH_REPO_ID: "chengliangli/qwen2.5-3b-alpaca"
+      INLINE_PUSH_PRIVATE: "1"
+      INLINE_PUSH_MERGE: "1"
+  
+  # Job submission configuration
+  submitterPodTemplate:
+    spec:
+      containers:
+      - name: job-submitter
+        image: rayproject/ray:2.52.1-py311-cu128
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+      restartPolicy: Never

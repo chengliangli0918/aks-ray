@@ -1,0 +1,44 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: llm-push-to-hub
+  labels:
+    app: ray-finetune
+spec:
+  clusterSelector:
+    ray.io/cluster: ray-finetune-cluster
+
+  # The adapter dir must exist on the Ray head pod. The script auto-finds the
+  # latest checkpoint-* subdir if you pass a parent dir.
+  # Update --adapter-dir to the best trial's checkpoint path printed by the
+  # fine-tune job (look for "Best checkpoint path:" in the driver logs, or
+  # browse /tmp/ray_results/llm-finetune-tune/ on the head pod).
+  entrypoint: >-
+    python /home/ray/scripts/push_to_hub.py
+    --adapter-dir REPLACE_WITH_BEST_CHECKPOINT_DIR
+    --base-model Qwen/Qwen2.5-3B
+    --repo-id chengliangli/qwen2.5-3b-alpaca
+    --private
+
+  runtimeEnvYAML: |
+    pip:
+      - transformers>=4.45.0
+      - peft>=0.13.0
+      - accelerate>=0.34.0
+      - huggingface_hub>=0.25.0
+    env_vars:
+      HUGGING_FACE_HUB_TOKEN: "${HUGGING_FACE_HUB_TOKEN}"
+
+  submitterPodTemplate:
+    spec:
+      containers:
+      - name: job-submitter
+        image: rayproject/ray:2.52.1-py311-cu128
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+      restartPolicy: Never
