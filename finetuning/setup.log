@@ -1,0 +1,573 @@
+==> Setting Azure subscription...
+==> Resource group chengliangli-rg already exists, skipping...
+==> Creating AKS automatic cluster: chengliangli-auto...
+WARNING: The behavior of this command has been altered by the following extension: aks-preview
+WARNING: Could not get signed in user: AADSTS530084: Access has been blocked by conditional access token protection policy configured by this organization. To learn more, see https://aka.ms/TBCADocs. Trace ID: 6d87df66-f57c-4774-a576-e97cc8420200 Correlation ID: 0bf0b6d9-d671-4f53-af38-cb252c709c1f Timestamp: 2026-06-01 03:37:15Z
+Using Azure Monitor Workspace (stores prometheus metrics) : /subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourceGroups/DefaultResourceGroup-italynorth/providers/microsoft.monitor/accounts/DefaultAzureMonitorWorkspace-italynorth
+{
+  "aadProfile": {
+    "adminGroupObjectIDs": null,
+    "clientAppId": null,
+    "enableAzureRbac": true,
+    "managed": true,
+    "serverAppId": null,
+    "serverAppSecret": null,
+    "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+  },
+  "addonProfiles": {
+    "azureKeyvaultSecretsProvider": {
+      "config": {
+        "enableSecretRotation": "true"
+      },
+      "enabled": true,
+      "identity": {
+        "clientId": "3c802dd6-274d-4a16-ae01-2b1edb133e60",
+        "objectId": "22fb4c2e-a6ca-414b-86f8-460e04d4153b",
+        "resourceId": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourcegroups/MC_chengliangli-rg_chengliangli-auto_italynorth/providers/Microsoft.ManagedIdentity/userAssignedIdentities/azurekeyvaultsecretsprovider-chengliangli-auto"
+      }
+    },
+    "azurepolicy": {
+      "config": null,
+      "enabled": true,
+      "identity": {
+        "clientId": "e77fae04-d58f-4b3c-bd79-df60658173e8",
+        "objectId": "66881209-4ade-4827-a583-89f24fb75756",
+        "resourceId": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourcegroups/MC_chengliangli-rg_chengliangli-auto_italynorth/providers/Microsoft.ManagedIdentity/userAssignedIdentities/azurepolicy-chengliangli-auto"
+      }
+    },
+    "extensionManager": {
+      "config": null,
+      "enabled": true,
+      "identity": null
+    },
+    "omsagent": {
+      "config": {
+        "logAnalyticsWorkspaceResourceID": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourceGroups/DefaultResourceGroup-EUS/providers/Microsoft.OperationalInsights/workspaces/DefaultWorkspace-c582d154-33c4-47e4-a3c2-0632d20b12eb-EUS",
+        "useAADAuth": "true"
+      },
+      "enabled": true,
+      "identity": null
+    }
+  },
+  "agentPoolProfiles": [
+    {
+      "artifactStreamingProfile": null,
+      "availabilityZones": [
+        "1",
+        "3",
+        "2"
+      ],
+      "capacityReservationGroupId": null,
+      "count": 3,
+      "creationData": null,
+      "currentOrchestratorVersion": "1.34.7",
+      "eTag": "5280a44e-f9a6-42ce-bac0-92d6f1613026",
+      "enableAutoScaling": false,
+      "enableEncryptionAtHost": false,
+      "enableFips": false,
+      "enableNodePublicIp": false,
+      "enableOsDiskFullCaching": null,
+      "enableUltraSsd": false,
+      "gatewayProfile": null,
+      "gpuInstanceProfile": null,
+      "gpuProfile": null,
+      "hostGroupId": null,
+      "kubeletConfig": null,
+      "kubeletDiskType": "OS",
+      "linuxOsConfig": null,
+      "localDnsProfile": null,
+      "maxCount": null,
+      "maxPods": 250,
+      "messageOfTheDay": null,
+      "minCount": null,
+      "mode": "System",
+      "name": "nodepool1",
+      "networkProfile": {
+        "allowedHostPorts": null,
+        "applicationSecurityGroups": null,
+        "nodePublicIpPrefixIDs": null,
+        "nodePublicIpTags": null,
+        "secondaryNetworkInterfaces": null
+      },
+      "nodeImageVersion": "AKSAzureLinux-V3gen2-202605.14.0",
+      "nodeInitializationTaints": null,
+      "nodeLabels": null,
+      "nodePublicIpPrefixId": null,
+      "nodeTaints": [
+        "CriticalAddonsOnly=true:NoSchedule"
+      ],
+      "orchestratorVersion": "1.34",
+      "osDiskSizeGb": 150,
+      "osDiskType": "Ephemeral",
+      "osSku": "AzureLinux",
+      "osType": "Linux",
+      "podIpAllocationMode": null,
+      "podSubnetId": null,
+      "powerState": {
+        "code": "Running"
+      },
+      "preparedImageSpecificationProfile": null,
+      "provisioningState": "Succeeded",
+      "proximityPlacementGroupId": null,
+      "scaleDownMode": "Delete",
+      "scaleSetEvictionPolicy": null,
+      "scaleSetPriority": null,
+      "securityProfile": {
+        "enableSecureBoot": false,
+        "enableVtpm": false,
+        "sshAccess": "Disabled"
+      },
+      "spotMaxPrice": null,
+      "status": null,
+      "tags": null,
+      "type": "VirtualMachineScaleSets",
+      "upgradeSettings": {
+        "drainTimeoutInMinutes": null,
+        "maxBlockedNodes": null,
+        "maxSurge": "10%",
+        "maxUnavailable": "0",
+        "nodeSoakDurationInMinutes": null,
+        "undrainableNodeBehavior": null
+      },
+      "upgradeSettingsBlueGreen": {
+        "batchSoakDurationInMinutes": null,
+        "drainBatchSize": null,
+        "drainTimeoutInMinutes": null,
+        "finalSoakDurationInMinutes": null
+      },
+      "upgradeStrategy": "Rolling",
+      "virtualMachineNodesStatus": null,
+      "virtualMachinesProfile": null,
+      "vmSize": "standard_d4lds_v5",
+      "vnetSubnetId": null,
+      "windowsProfile": null,
+      "workloadRuntime": "OCIContainer"
+    }
+  ],
+  "aiToolchainOperatorProfile": null,
+  "apiServerAccessProfile": {
+    "authorizedIpRanges": null,
+    "disableRunCommand": null,
+    "enablePrivateCluster": false,
+    "enablePrivateClusterPublicFqdn": null,
+    "enableVnetIntegration": true,
+    "privateDnsZone": null,
+    "subnetId": ""
+  },
+  "autoScalerProfile": null,
+  "autoUpgradeProfile": {
+    "nodeOsUpgradeChannel": "NodeImage",
+    "upgradeChannel": "stable"
+  },
+  "azureMonitorProfile": {
+    "appMonitoring": null,
+    "containerInsights": {
+      "containerNetworkLogs": null,
+      "disableCustomMetrics": null,
+      "disablePrometheusMetricsScraping": null,
+      "enabled": true,
+      "logAnalyticsWorkspaceResourceId": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourceGroups/DefaultResourceGroup-EUS/providers/Microsoft.OperationalInsights/workspaces/DefaultWorkspace-c582d154-33c4-47e4-a3c2-0632d20b12eb-EUS",
+      "syslogPort": null
+    },
+    "metrics": {
+      "controlPlane": null,
+      "enabled": true,
+      "kubeStateMetrics": {
+        "metricAnnotationsAllowList": "",
+        "metricLabelsAllowlist": ""
+      }
+    }
+  },
+  "azurePortalFqdn": "chengliang-chengliangli-rg-c582d1-t5bbcv5q.portal.hcp.italynorth.azmk8s.io",
+  "bootstrapProfile": {
+    "artifactSource": "Direct",
+    "containerRegistryId": null
+  },
+  "controlPlaneScalingProfile": null,
+  "creationData": null,
+  "currentKubernetesVersion": "1.34.7",
+  "disableLocalAccounts": true,
+  "diskEncryptionSetId": null,
+  "dnsPrefix": "chengliang-chengliangli-rg-c582d1",
+  "eTag": "d8d18adc-6f90-489b-a703-0da6ad9ab612",
+  "enableFips": false,
+  "enableNamespaceResources": null,
+  "enableRbac": true,
+  "extendedLocation": null,
+  "fqdn": "chengliang-chengliangli-rg-c582d1-t5bbcv5q.hcp.italynorth.azmk8s.io",
+  "fqdnSubdomain": null,
+  "healthMonitorProfile": {
+    "enableContinuousControlPlaneAndAddonMonitor": true,
+    "enableOnDemandMonitor": true
+  },
+  "hostedSystemProfile": {
+    "enabled": false,
+    "nodeSubnetId": null,
+    "systemNodeSubnetId": null
+  },
+  "httpProxyConfig": null,
+  "id": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourcegroups/chengliangli-rg/providers/Microsoft.ContainerService/managedClusters/chengliangli-auto",
+  "identity": {
+    "delegatedResources": null,
+    "principalId": "8a4d9923-0781-43f0-8a83-548a31ef6c00",
+    "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+    "type": "SystemAssigned",
+    "userAssignedIdentities": null
+  },
+  "identityProfile": {
+    "kubeletidentity": {
+      "clientId": "793ca5f6-37c4-4ed9-897e-9d8f5ebae185",
+      "objectId": "3405b0a6-67a5-4404-8cf1-0cc4f9ee1697",
+      "resourceId": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourcegroups/MC_chengliangli-rg_chengliangli-auto_italynorth/providers/Microsoft.ManagedIdentity/userAssignedIdentities/chengliangli-auto-agentpool"
+    }
+  },
+  "ingressProfile": {
+    "applicationLoadBalancer": null,
+    "gatewayApi": null,
+    "webAppRouting": {
+      "defaultDomain": {
+        "domainName": null,
+        "enabled": false
+      },
+      "dnsZoneResourceIds": null,
+      "enabled": true,
+      "gatewayApiImplementations": {
+        "appRoutingIstio": {
+          "mode": "Disabled"
+        }
+      },
+      "identity": {
+        "clientId": "93df36b3-51eb-43d6-a10d-a7b3093079d3",
+        "objectId": "3a2058b9-f287-4322-bbcc-2d51671ca543",
+        "resourceId": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourcegroups/MC_chengliangli-rg_chengliangli-auto_italynorth/providers/Microsoft.ManagedIdentity/userAssignedIdentities/webapprouting-chengliangli-auto"
+      },
+      "nginx": {
+        "defaultIngressControllerType": "AnnotationControlled"
+      }
+    }
+  },
+  "kind": "Automatic",
+  "kubernetesVersion": "1.34",
+  "linuxProfile": {
+    "adminUsername": "azureuser",
+    "ssh": {
+      "publicKeys": [
+        {
+          "keyData": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCabjBv5LpGAnmF/qNv0zD1Oub4Od9iYQ3ucvKLSbKC8VgCsTM7g0bQTCLQPY9f9LRPF8G5sVvK3/aDEQCAYmAqoMO1+GbMf67Gg+EuFIR0om18Zao4+rNEKJvnCwjontVBO89J73RSjm9MDGdcRkCA/tQIgmqPGXYfCwbis3P3S+/unrCZ3r/MEdCGmDWvg92Ye6hqZ+Egh81tFZZzS9i6azBmfQl7XeMQ4Hz9yUsnmiy6REATC4w5qE+hDts9vLsoWAabbL9dY4GuBZa5x7zXqxYJwX8ukN6lsnbT4aIvsxplpjBvE5XYNiSxAnKPPrqqnPheY9Uez4ydAH2M+rpB"
+        }
+      ]
+    }
+  },
+  "location": "italynorth",
+  "maxAgentPools": 100,
+  "metricsProfile": {
+    "costAnalysis": {
+      "enabled": false
+    }
+  },
+  "name": "chengliangli-auto",
+  "networkProfile": {
+    "advancedNetworking": null,
+    "dnsServiceIp": "10.0.0.10",
+    "ipFamilies": [
+      "IPv4"
+    ],
+    "kubeProxyConfig": {
+      "enabled": null,
+      "ipvsConfig": null,
+      "mode": null
+    },
+    "loadBalancerProfile": {
+      "allocatedOutboundPorts": null,
+      "backendPoolType": "nodeIPConfiguration",
+      "clusterServiceLoadBalancerHealthProbeMode": null,
+      "effectiveOutboundIPs": null,
+      "enableMultipleStandardLoadBalancers": null,
+      "idleTimeoutInMinutes": null,
+      "managedOutboundIPs": null,
+      "outboundIPs": null,
+      "outboundIpPrefixes": null
+    },
+    "loadBalancerSku": "standard",
+    "natGatewayProfile": {
+      "effectiveOutboundIPs": [
+        {
+          "id": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourceGroups/MC_chengliangli-rg_chengliangli-auto_italynorth/providers/Microsoft.Network/publicIPAddresses/b4a4eb21-1aaf-4cbc-b501-74b793c58db2",
+          "resourceGroup": "MC_chengliangli-rg_chengliangli-auto_italynorth"
+        }
+      ],
+      "idleTimeoutInMinutes": 4,
+      "managedOutboundIpProfile": {
+        "count": 1,
+        "countIPv6": null
+      },
+      "outboundIPs": null,
+      "outboundIpPrefixes": null
+    },
+    "networkDataplane": "cilium",
+    "networkMode": null,
+    "networkPlugin": "azure",
+    "networkPluginMode": "overlay",
+    "networkPolicy": "cilium",
+    "outboundType": "managedNATGateway",
+    "podCidr": "10.244.0.0/16",
+    "podCidrs": [
+      "10.244.0.0/16"
+    ],
+    "podLinkLocalAccess": "IMDS",
+    "serviceCidr": "10.0.0.0/16",
+    "serviceCidrs": [
+      "10.0.0.0/16"
+    ],
+    "staticEgressGatewayProfile": null
+  },
+  "nodeDisruptionProfile": {
+    "nodeDisruptionPolicy": "Allow"
+  },
+  "nodeProvisioningProfile": {
+    "defaultNodePools": "Auto",
+    "mode": "Auto"
+  },
+  "nodeResourceGroup": "MC_chengliangli-rg_chengliangli-auto_italynorth",
+  "nodeResourceGroupProfile": {
+    "restrictionLevel": "ReadOnly"
+  },
+  "oidcIssuerProfile": {
+    "enabled": true,
+    "issuerUrl": "https://italynorth.oic.prod-aks.azure.com/72f988bf-86f1-41af-91ab-2d7cd011db47/f84aebea-2330-44f7-aaf2-013bfe447739/"
+  },
+  "podIdentityProfile": null,
+  "powerState": {
+    "code": "Running"
+  },
+  "privateFqdn": null,
+  "privateLinkResources": null,
+  "provisioningState": "Succeeded",
+  "publicNetworkAccess": null,
+  "resourceGroup": "chengliangli-rg",
+  "resourceUid": "6a1cfbb1dd0e45000169fcbd",
+  "schedulerProfile": null,
+  "securityProfile": {
+    "azureKeyVaultKms": null,
+    "customCaTrustCertificates": null,
+    "defender": null,
+    "imageCleaner": {
+      "enabled": true,
+      "intervalHours": 168
+    },
+    "imageIntegrity": null,
+    "kubernetesResourceObjectEncryptionProfile": null,
+    "nodeRestriction": null,
+    "serviceAccountImagePullProfile": null,
+    "workloadIdentity": {
+      "enabled": true
+    }
+  },
+  "serviceMeshProfile": null,
+  "servicePrincipalProfile": {
+    "clientId": "msi",
+    "secret": null
+  },
+  "sku": {
+    "name": "Automatic",
+    "tier": "Standard"
+  },
+  "status": null,
+  "storageProfile": {
+    "blobCsiDriver": null,
+    "diskCsiDriver": {
+      "enabled": true
+    },
+    "fileCsiDriver": {
+      "enabled": true
+    },
+    "snapshotController": {
+      "enabled": true
+    }
+  },
+  "supportPlan": "KubernetesOfficial",
+  "systemData": null,
+  "tags": null,
+  "type": "Microsoft.ContainerService/ManagedClusters",
+  "upgradeSettings": null,
+  "windowsProfile": null,
+  "workloadAutoScalerProfile": {
+    "keda": {
+      "enabled": true
+    },
+    "verticalPodAutoscaler": {
+      "addonAutoscaling": "Unspecified",
+      "enabled": true
+    }
+  }
+}
+==> Waiting for cluster provisioning to complete...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning state: Updating. Waiting...
+==> Cluster provisioning completed.
+==> Adding GPU workload node pool with Standard_ND96amsr_A100_v4...
+WARNING: Argument '--enable-managed-gpu' is in preview and under development. Reference and support levels: https://aka.ms/CLI_refstatus
+WARNING: The behavior of this command has been altered by the following extension: aks-preview
+WARNING: The new node pool will enable SSH access, recommended to use '--ssh-access disabled' option to disable SSH access for the node pool to make it more secure.
+{
+  "artifactStreamingProfile": null,
+  "availabilityZones": null,
+  "capacityReservationGroupId": null,
+  "count": 1,
+  "creationData": null,
+  "currentOrchestratorVersion": "1.34.7",
+  "eTag": "4c8e674c-3b94-457c-8c59-7a6ee9bf6f0e",
+  "enableAutoScaling": false,
+  "enableEncryptionAtHost": false,
+  "enableFips": false,
+  "enableNodePublicIp": false,
+  "enableOsDiskFullCaching": null,
+  "enableUltraSsd": false,
+  "gatewayProfile": null,
+  "gpuInstanceProfile": null,
+  "gpuProfile": {
+    "driver": "Install",
+    "driverType": "",
+    "nvidia": {
+      "managementMode": "Managed",
+      "migStrategy": null
+    }
+  },
+  "hostGroupId": null,
+  "id": "/subscriptions/c582d154-33c4-47e4-a3c2-0632d20b12eb/resourcegroups/chengliangli-rg/providers/Microsoft.ContainerService/managedClusters/chengliangli-auto/agentPools/workload",
+  "kubeletConfig": null,
+  "kubeletDiskType": "OS",
+  "linuxOsConfig": null,
+  "localDnsProfile": null,
+  "maxCount": null,
+  "maxPods": 250,
+  "messageOfTheDay": null,
+  "minCount": null,
+  "mode": "User",
+  "name": "workload",
+  "networkProfile": {
+    "allowedHostPorts": null,
+    "applicationSecurityGroups": null,
+    "nodePublicIpPrefixIDs": null,
+    "nodePublicIpTags": null,
+    "secondaryNetworkInterfaces": null
+  },
+  "nodeImageVersion": "AKSUbuntu-2204gen2containerd-202605.14.0",
+  "nodeInitializationTaints": null,
+  "nodeLabels": null,
+  "nodePublicIpPrefixId": null,
+  "nodeTaints": null,
+  "orchestratorVersion": "1.34",
+  "osDiskSizeGb": 1024,
+  "osDiskType": "Ephemeral",
+  "osSku": "Ubuntu",
+  "osType": "Linux",
+  "podIpAllocationMode": null,
+  "podSubnetId": null,
+  "powerState": {
+    "code": "Running"
+  },
+  "preparedImageSpecificationProfile": null,
+  "provisioningState": "Succeeded",
+  "proximityPlacementGroupId": null,
+  "resourceGroup": "chengliangli-rg",
+  "scaleDownMode": "Delete",
+  "scaleSetEvictionPolicy": null,
+  "scaleSetPriority": null,
+  "securityProfile": {
+    "enableSecureBoot": false,
+    "enableVtpm": false,
+    "sshAccess": "Disabled"
+  },
+  "spotMaxPrice": null,
+  "status": null,
+  "systemData": null,
+  "tags": null,
+  "type": "Microsoft.ContainerService/managedClusters/agentPools",
+  "typePropertiesType": "VirtualMachineScaleSets",
+  "upgradeSettings": {
+    "drainTimeoutInMinutes": null,
+    "maxBlockedNodes": null,
+    "maxSurge": "10%",
+    "maxUnavailable": "0",
+    "nodeSoakDurationInMinutes": null,
+    "undrainableNodeBehavior": null
+  },
+  "upgradeSettingsBlueGreen": {
+    "batchSoakDurationInMinutes": null,
+    "drainBatchSize": null,
+    "drainTimeoutInMinutes": null,
+    "finalSoakDurationInMinutes": null
+  },
+  "upgradeStrategy": "Rolling",
+  "virtualMachineNodesStatus": null,
+  "virtualMachinesProfile": null,
+  "vmSize": "Standard_ND96amsr_A100_v4",
+  "vnetSubnetId": null,
+  "windowsProfile": null,
+  "workloadRuntime": "OCIContainer"
+}
+==> Waiting for GPU node pool to be ready...
+==> Getting AKS credentials...
+WARNING: The behavior of this command has been altered by the following extension: aks-preview
+WARNING: Merged "chengliangli-auto" as current context in /home/charlili/.kube/config
+WARNING: Converted kubeconfig to use Azure CLI authentication.
+==> Converting kubeconfig for Azure CLI authentication...
+==> Verifying GPU availability...
+==> Total GPUs available: 
+==> Installing KubeRay operator...
+"kuberay" already exists with the same configuration, skipping
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "kuberay" chart repository
+...Successfully got an update from the "nvidia" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Error: query: failed to query with labels: secrets is forbidden: User "charlili@microsoft.com" cannot list resource "secrets" in API group "" in the namespace "kuberay-system": User does not have access to the resource in Azure. Update role assignment to allow access.
+==> Setting Azure subscription...
+==> Resource group chengliangli-rg already exists, skipping...
+==> AKS cluster chengliangli-auto already exists, skipping...
+==> Waiting for cluster provisioning to complete...
+==> Cluster provisioning completed.
+==> Node pool 'workload' already exists, skipping...
+==> Waiting for GPU node pool to be ready...
+==> Getting AKS credentials...
+WARNING: The behavior of this command has been altered by the following extension: aks-preview
+WARNING: Merged "chengliangli-auto" as current context in /home/charlili/.kube/config
+WARNING: Converted kubeconfig to use Azure CLI authentication.
+==> Converting kubeconfig for Azure CLI authentication...
+==> Verifying GPU availability...
+==> Total GPUs available: 
+==> Installing KubeRay operator...
+"kuberay" already exists with the same configuration, skipping
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "kuberay" chart repository
+...Successfully got an update from the "nvidia" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Release "kuberay-operator" does not exist. Installing it now.
+W0531 21:27:15.878744  165940 warnings.go:70] kuberay-operator had anti-affinity and topology spread constraints added to improve availability by distributing pods across nodes. Learn more at aka.ms/aks/deployment-safeguards
+W0531 21:27:15.878774  165940 warnings.go:70] kuberay-operator had resource requests and limits added or adjusted to improve quality of service and prevent resource starvation. Learn more at aka.ms/aks/deployment-safeguards
+W0531 21:27:15.878776  165940 warnings.go:70] [azurepolicy-k8sazurev2customcontainerallow-db27d7bfaf0671f6e28a] Container image quay.io/kuberay/operator:v1.6.0 for container kuberay-operator has not been allowed.
+NAME: kuberay-operator
+LAST DEPLOYED: Sun May 31 21:26:58 2026
+NAMESPACE: kuberay-system
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+==> Waiting for KubeRay operator to be ready...
+deployment.apps/kuberay-operator condition met
+==> Creating Hugging Face token secret...
+secret/hf-token created
+==> Creating ConfigMap for fine-tuning script...
+configmap/finetune-script created
+==> Deploying Ray Cluster for fine-tuning...
+raycluster.ray.io/ray-finetune-cluster created
+==> Waiting for Ray Cluster to be ready...
+error: timed out waiting for the condition on rayclusters/ray-finetune-cluster
+==> Creating LoadBalancer service for Ray Dashboard...
+Error from server (Forbidden): error when creating "STDIN": admission webhook "validation.gatekeeper.sh" denied the request: [azurepolicy-k8sazurev1uniqueserviceselecto-f364b63a600ee7c7177f] same selector as service <ray-dashboard-lb> in namespace <default> with overlapping ports. For more information, visit https://aka.ms/aks/deployment-safeguards

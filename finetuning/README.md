@@ -182,10 +182,10 @@ Fine-tuned `Qwen/Qwen2.5-3B` on `tatsu-lab/alpaca` (10k samples, 1 epoch, LoRA r
 
 | Metric | Base (Qwen2.5-3B) | Fine-tuned | Δ |
 |---|---:|---:|---:|
-| Avg perplexity | 3.37 | **2.88** | −0.49 (−14%) |
-| Avg ROUGE-L F1 | 0.298 | **0.392** | +0.094 (+31%) |
-| Avg latency / prompt | 4.86 s | **2.76 s** | −43% |
-| Tokens / sec | 23.0 | 23.1 | ≈same |
+| Avg perplexity | 3.37 | **2.90** | −0.47 (−14%) |
+| Avg ROUGE-L F1 | 0.298 | **0.383** | +0.085 (+29%) |
+| Avg latency / prompt | 4.86 s | **2.55 s** | −47% |
+| Tokens / sec | 22.9 | 23.1 | ≈same |
 
 The fine-tuned model produces shorter, more on-target responses in the Alpaca instruction style — the latency drop comes from fewer generated tokens (same throughput), not from a faster model. Full raw summary in [comparison.json](./comparison.json).
 

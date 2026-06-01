@@ -180,7 +180,7 @@ echo "==> Deploying Ray Cluster for fine-tuning..."
 kubectl apply -f ray-cluster.finetune.yaml
 
 echo "==> Waiting for Ray Cluster to be ready..."
-kubectl wait --for=condition=Ready --timeout=600s raycluster/ray-finetune-cluster || true
+kubectl wait --for=condition=RayClusterProvisioned --timeout=600s raycluster/ray-finetune-cluster || true
 
 # -----------------------------------------------------------------------------
 # Step 10: Create LoadBalancer Service for Ray Dashboard
