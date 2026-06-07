@@ -17,7 +17,7 @@ spec:
     python /home/ray/scripts/push_to_hub.py
     --adapter-dir REPLACE_WITH_BEST_CHECKPOINT_DIR
     --base-model Qwen/Qwen2.5-3B
-    --repo-id chengliangli/qwen2.5-3b-alpaca
+    --repo-id chengliangli/qwen2.5-3b-aks-tsg
     --private
 
   runtimeEnvYAML: |

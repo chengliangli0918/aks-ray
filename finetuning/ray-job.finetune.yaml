@@ -37,7 +37,8 @@ spec:
     env_vars:
       WANDB_DISABLED: "true"
       PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb:512"
-      INLINE_PUSH_REPO_ID: "chengliangli/qwen2.5-3b-alpaca"
+      DATASET_DIR: "/home/ray/dataset"
+      INLINE_PUSH_REPO_ID: "chengliangli/qwen2.5-3b-aks-tsg"
       INLINE_PUSH_PRIVATE: "1"
       INLINE_PUSH_MERGE: "1"
   

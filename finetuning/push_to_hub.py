@@ -6,7 +6,7 @@ Usage:
     python push_to_hub.py \
         --adapter-dir /tmp/ray_results/llm-finetune-tune/<best_trial>/checkpoint_000000 \
         --base-model Qwen/Qwen2.5-3B \
-        --repo-id user/repo-name \
+        --repo-id chengliangli/qwen2.5-3b-aks-tsg \
         --private
 
 Reads HUGGING_FACE_HUB_TOKEN (or HF_TOKEN) from environment.

@@ -1,8 +1,8 @@
 """
 Compare inference quality of the base model vs. the fine-tuned (LoRA) model.
 
-For each prompt from a held-out slice of the Alpaca dataset (or a custom prompt
-file), this script generates a response from:
+For each prompt from a held-out slice of the AKS combined dataset (or a custom
+prompt file), this script generates a response from:
   1. The base Hugging Face model.
   2. The base model + LoRA adapter produced by `finetune_with_tune.py`
      (either a local checkpoint dir or a HF Hub repo id).
@@ -23,13 +23,19 @@ Usage:
     # Or pull the adapter from the Hub:
     python compare_inference.py \\
         --base-model Qwen/Qwen2.5-3B \\
-        --adapter your-user/qwen2.5-3b-alpaca-lora \\
+        --adapter chengliangli/qwen2.5-3b-aks-tsg \\
         --num-samples 20
+
+By default the held-out prompts are read from
+``$DATASET_DIR/aks_combined.val.jsonl`` (DATASET_DIR defaults to
+``/home/ray/dataset``). Override with ``--eval-file`` to point at any
+Alpaca-style JSONL file with ``instruction``/``input``/``output`` fields.
 """
 
 import argparse
 import json
 import math
+import os
 import time
 from typing import Any, Dict, List
 
@@ -37,6 +43,9 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
+
+DEFAULT_DATASET_DIR = os.environ.get("DATASET_DIR", "/home/ray/dataset")
+DEFAULT_VAL_FILE = "aks_combined.val.jsonl"
 
 
 def format_prompt(instruction: str, input_text: str = "") -> str:
@@ -48,14 +57,29 @@ def format_prompt(instruction: str, input_text: str = "") -> str:
     return f"### Instruction:\n{instruction}\n\n### Response:\n"
 
 
-def load_eval_samples(num_samples: int, seed: int = 123) -> List[Dict[str, str]]:
-    ds = load_dataset("tatsu-lab/alpaca", split="train")
-    # Use a different seed than training so we sample a held-out slice.
-    ds = ds.shuffle(seed=seed).select(range(num_samples))
+def load_eval_samples(
+    num_samples: int,
+    seed: int = 123,
+    eval_file: str = None,
+) -> List[Dict[str, str]]:
+    """Load held-out evaluation prompts from an Alpaca-style JSONL file.
+
+    Defaults to ``$DATASET_DIR/aks_combined.val.jsonl``. The val file is
+    already a held-out split, so we just shuffle and take ``num_samples``.
+    """
+    if eval_file is None:
+        eval_file = os.path.join(DEFAULT_DATASET_DIR, DEFAULT_VAL_FILE)
+    if not os.path.isfile(eval_file):
+        raise FileNotFoundError(
+            f"Evaluation JSONL not found: {eval_file}. "
+            "Pass --eval-file or set DATASET_DIR."
+        )
+    ds = load_dataset("json", data_files=eval_file, split="train")
+    ds = ds.shuffle(seed=seed).select(range(min(num_samples, len(ds))))
     return [
         {
             "instruction": ex["instruction"],
-            "input": ex.get("input", ""),
+            "input": ex.get("input") or "",
             "reference": ex["output"],
         }
         for ex in ds
@@ -203,10 +227,17 @@ def main():
     ap.add_argument("--num-samples", type=int, default=10)
     ap.add_argument("--max-new-tokens", type=int, default=256)
     ap.add_argument(
+        "--eval-file",
+        type=str,
+        default=None,
+        help="Path to an Alpaca-style JSONL file with held-out prompts "
+             "(default: $DATASET_DIR/aks_combined.val.jsonl).",
+    )
+    ap.add_argument(
         "--prompts-file",
         type=str,
         default=None,
-        help="Optional JSON file of prompts (overrides Alpaca sampling).",
+        help="Optional JSON file of prompts (overrides --eval-file).",
     )
     ap.add_argument(
         "--output-json",
@@ -224,7 +255,7 @@ def main():
     samples = (
         load_prompts_from_file(args.prompts_file)
         if args.prompts_file
-        else load_eval_samples(args.num_samples)
+        else load_eval_samples(args.num_samples, eval_file=args.eval_file)
     )
 
     tokenizer, base_model, ft_model = load_models(args.base_model, args.adapter, dtype)

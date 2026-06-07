@@ -8,8 +8,13 @@ This script demonstrates how to fine-tune a Large Language Model (LLM) using:
 - PEFT/LoRA: For parameter-efficient fine-tuning
 - QLoRA: For memory-efficient 4-bit quantization
 
-The script uses the Alpaca dataset format and supports various base models
-from Hugging Face.
+Dataset:
+    Reads pre-split Alpaca-style JSONL files from ``DATASET_DIR``
+    (default ``/home/ray/dataset``):
+      - ``aks_combined.train.jsonl``
+      - ``aks_combined.val.jsonl``
+    Each record has ``instruction``, ``input``, ``output`` (and an optional
+    ``meta`` field that is ignored).
 
 Usage:
     python finetune_with_tune.py [--model MODEL_NAME] [--num-samples N]
@@ -66,8 +71,10 @@ from trl import SFTTrainer
 
 # Default model and dataset configuration
 DEFAULT_MODEL = "Qwen/Qwen2.5-3B"  # Smaller model for faster experimentation
-DEFAULT_DATASET = "tatsu-lab/alpaca"
-MAX_SEQ_LENGTH = 512
+DEFAULT_DATASET_DIR = os.environ.get("DATASET_DIR", "/home/ray/dataset")
+DEFAULT_TRAIN_FILE = "aks_combined.train.jsonl"
+DEFAULT_VAL_FILE = "aks_combined.val.jsonl"
+MAX_SEQ_LENGTH = 1024  # AKS docs/TSG records are longer than Alpaca samples
 
 # Hyperparameter search space for Ray Tune
 TUNE_CONFIG = {
@@ -103,25 +110,56 @@ def format_alpaca_prompt(example: Dict[str, str]) -> str:
 
 
 def prepare_dataset(tokenizer, max_length: int = MAX_SEQ_LENGTH):
-    """Load and preprocess the Alpaca dataset."""
-    dataset = load_dataset(DEFAULT_DATASET, split="train")
-    
-    # Take a subset for faster training (adjust for full training)
-    dataset = dataset.shuffle(seed=42).select(range(min(10000, len(dataset))))
-    
+    """Load and preprocess the AKS combined (docs + TSG + ICM) dataset.
+
+    The dataset is expected to be a pre-split pair of Alpaca-style JSONL files
+    under ``DATASET_DIR`` (default ``/home/ray/dataset``). Each record has
+    ``instruction``, ``input``, ``output`` fields; any extra fields (e.g.
+    ``meta``) are dropped during preprocessing.
+
+    Returns a ``DatasetDict`` with ``train`` and ``test`` splits, each
+    containing a single ``text`` column ready for SFT.
+    """
+    dataset_dir = os.environ.get("DATASET_DIR", DEFAULT_DATASET_DIR)
+    train_path = os.path.join(
+        dataset_dir, os.environ.get("DATASET_TRAIN_FILE", DEFAULT_TRAIN_FILE)
+    )
+    val_path = os.path.join(
+        dataset_dir, os.environ.get("DATASET_VAL_FILE", DEFAULT_VAL_FILE)
+    )
+    if not os.path.isfile(train_path) or not os.path.isfile(val_path):
+        raise FileNotFoundError(
+            f"Expected train/val JSONL files at {train_path} and {val_path}. "
+            "Mount the dataset directory at DATASET_DIR (default /home/ray/dataset)."
+        )
+
+    dataset = load_dataset(
+        "json",
+        data_files={"train": train_path, "test": val_path},
+    )
+
     def preprocess_function(examples):
-        texts = [format_alpaca_prompt({"instruction": i, "input": inp, "output": o}) 
-                 for i, inp, o in zip(examples["instruction"], 
-                                       examples["input"], 
-                                       examples["output"])]
+        texts = [
+            format_alpaca_prompt(
+                {"instruction": i, "input": inp or "", "output": o}
+            )
+            for i, inp, o in zip(
+                examples["instruction"], examples["input"], examples["output"]
+            )
+        ]
         return {"text": texts}
-    
+
+    cols_to_remove = dataset["train"].column_names
     dataset = dataset.map(
         preprocess_function,
         batched=True,
-        remove_columns=dataset.column_names,
+        remove_columns=cols_to_remove,
     )
-    
+
+    print(
+        f"Loaded AKS dataset from {dataset_dir}: "
+        f"train={len(dataset['train'])}, test={len(dataset['test'])}"
+    )
     return dataset
 
 
@@ -179,7 +217,6 @@ def train_func(config: Dict[str, Any]):
     model.print_trainable_parameters()
 
     dataset = prepare_dataset(tokenizer)
-    dataset = dataset.train_test_split(test_size=0.1, seed=42)
     train_dataset = dataset["train"]
     eval_dataset = dataset["test"]
 

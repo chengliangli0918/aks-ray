@@ -28,6 +28,16 @@ LOCATION="italynorth"
 GPU_VM_SIZE="Standard_ND96amsr_A100_v4"  # A100 GPU optimized for AI workloads
 HF_TOKEN="${HF_TOKEN:-}"  # Hugging Face API token — export HF_TOKEN=hf_xxx before running
 
+# Local dataset to upload into the cluster. Expects pre-split JSONL files:
+#   $DATASET_SRC_DIR/aks_combined.train.jsonl
+#   $DATASET_SRC_DIR/aks_combined.val.jsonl
+DATASET_SRC_DIR="${DATASET_SRC_DIR:-/home/charlili/go/src/github.com/chengliangli0918/aks-tsg/dataset}"
+DATASET_TRAIN_FILE="aks_combined.train.jsonl"
+DATASET_VAL_FILE="aks_combined.val.jsonl"
+DATASET_PVC_NAME="aks-dataset"
+DATASET_PVC_SIZE="5Gi"
+DATASET_STORAGE_CLASS="azurefile-csi"  # ReadWriteMany so head + workers can mount
+
 # Storage configuration for checkpoints and datasets
 STORAGE_ACCOUNT_NAME=""  # Azure Storage account name (optional)
 STORAGE_CONTAINER_NAME="raycheckpoints"  # Container for Ray checkpoints
@@ -172,6 +182,73 @@ kubectl create configmap finetune-script \
     --from-file=compare_inference.py \
     --from-file=push_to_hub.py \
     --dry-run=client -o yaml | kubectl apply -f -
+
+# -----------------------------------------------------------------------------
+# Step 8a: Provision Dataset PVC and Upload Local JSONL Files
+# -----------------------------------------------------------------------------
+# The AKS combined dataset (~27 MiB) is too large for a ConfigMap (1 MiB limit),
+# so we provision an Azure Files (ReadWriteMany) PVC and `kubectl cp` the local
+# train/val JSONL files into it. The PVC is then mounted at /home/ray/dataset
+# on the Ray head and worker pods.
+# -----------------------------------------------------------------------------
+if [ ! -f "$DATASET_SRC_DIR/$DATASET_TRAIN_FILE" ] || [ ! -f "$DATASET_SRC_DIR/$DATASET_VAL_FILE" ]; then
+    echo "ERROR: Expected dataset files not found:"
+    echo "       $DATASET_SRC_DIR/$DATASET_TRAIN_FILE"
+    echo "       $DATASET_SRC_DIR/$DATASET_VAL_FILE"
+    echo "       Override DATASET_SRC_DIR if your dataset lives elsewhere."
+    exit 1
+fi
+
+echo "==> Creating dataset PVC '$DATASET_PVC_NAME' ($DATASET_PVC_SIZE, $DATASET_STORAGE_CLASS)..."
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $DATASET_PVC_NAME
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: $DATASET_STORAGE_CLASS
+  resources:
+    requests:
+      storage: $DATASET_PVC_SIZE
+EOF
+
+echo "==> Launching dataset-loader pod to populate PVC..."
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dataset-loader
+  labels:
+    app: ray-finetune
+spec:
+  restartPolicy: Never
+  containers:
+  - name: loader
+    image: mcr.microsoft.com/cbl-mariner/busybox:2.0
+    command: ["sh", "-c", "mkdir -p /data && sleep 3600"]
+    volumeMounts:
+    - name: dataset
+      mountPath: /data
+  volumes:
+  - name: dataset
+    persistentVolumeClaim:
+      claimName: $DATASET_PVC_NAME
+EOF
+
+echo "==> Waiting for dataset-loader pod to be Ready..."
+kubectl wait --for=condition=Ready --timeout=300s pod/dataset-loader
+
+echo "==> Uploading $DATASET_TRAIN_FILE and $DATASET_VAL_FILE to PVC..."
+kubectl cp "$DATASET_SRC_DIR/$DATASET_TRAIN_FILE" "dataset-loader:/data/$DATASET_TRAIN_FILE"
+kubectl cp "$DATASET_SRC_DIR/$DATASET_VAL_FILE"   "dataset-loader:/data/$DATASET_VAL_FILE"
+
+echo "==> Verifying uploaded dataset files..."
+kubectl exec dataset-loader -- ls -lh /data
+
+echo "==> Removing dataset-loader pod..."
+kubectl delete pod dataset-loader --wait=false
 
 # -----------------------------------------------------------------------------
 # Step 9: Deploy Ray Cluster for Fine-tuning

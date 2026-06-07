@@ -1,6 +1,6 @@
 # LLM Fine-tuning with Ray Train + Ray Tune on AKS Automatic
 
-This sample demonstrates how to fine-tune Large Language Models (LLMs) on AKS Automatic using Ray Train for distributed training and Ray Tune for hyperparameter optimization.
+This sample demonstrates how to fine-tune Large Language Models (LLMs) on AKS Automatic using Ray Train for distributed training and Ray Tune for hyperparameter optimization. The example fine-tunes `Qwen/Qwen2.5-3B` on a local AKS-domain instruction dataset built from AKS public documentation, the AKS troubleshooting guide (TSG), and anonymized IcM incident summaries.
 
 ## Overview
 
@@ -75,6 +75,14 @@ The sample provides:
 2. Azure CLI, kubectl, Helm, and kubelogin installed
 3. [Hugging Face](https://huggingface.co/) account and API token
 4. **Azure Kubernetes Service RBAC Cluster Admin** role
+5. A local copy of the AKS combined dataset (Alpaca-style JSONL files):
+   - `aks_combined.train.jsonl` (~12k records)
+   - `aks_combined.val.jsonl` (~1.4k records)
+
+   Each record has `instruction` / `input` / `output` fields built from AKS
+   public docs, the AKS TSG, and IcM incident summaries. Point `DATASET_SRC_DIR`
+   at the directory that contains these two files before running the setup
+   script (default: `/home/charlili/go/src/github.com/chengliangli0918/aks-tsg/dataset`).
 
 ## Quick Start
 
@@ -88,6 +96,7 @@ RESOURCE_GROUP="your-resource-group"
 CLUSTER_NAME="your-cluster-name"
 LOCATION="your-region"  # e.g., italynorth, eastus2
 HF_TOKEN="your-huggingface-token"
+DATASET_SRC_DIR="/abs/path/to/aks-combined-dataset"  # contains the two JSONL files
 ```
 
 ### 2. Run the Setup Script
@@ -101,8 +110,12 @@ chmod +x setup-aks-raytune-finetune.sh
 This will:
 1. Create an AKS Automatic cluster with GPU nodes
 2. Install the KubeRay operator
-3. Deploy a Ray cluster for fine-tuning
-4. Create the fine-tuning script ConfigMap
+3. Create a `hf-token` Secret and a `finetune-script` ConfigMap
+4. Provision an `aks-dataset` Azure Files PVC (ReadWriteMany) and upload
+   `aks_combined.train.jsonl` / `aks_combined.val.jsonl` into it via
+   `kubectl cp`
+5. Deploy a Ray cluster for fine-tuning (with the PVC mounted at
+   `/home/ray/dataset` on the head and worker pods)
 
 ### 3. Submit a Fine-tuning Job
 
@@ -152,56 +165,57 @@ TUNE_CONFIG = {
 
 ### Custom Dataset
 
-Replace the `prepare_dataset()` function in `finetune_with_tune.py`:
+The fine-tuning script reads pre-split Alpaca-style JSONL files from
+`$DATASET_DIR` (default `/home/ray/dataset`, populated from the
+`aks-dataset` PVC). To swap in a different dataset:
 
-```python
-def prepare_dataset(tokenizer, max_length=512):
-    # Load your custom dataset
-    dataset = load_dataset("your-org/your-dataset")
-    # Process as needed
-    return dataset
-```
+1. Replace the contents of the `aks-dataset` PVC with your own
+   `*.train.jsonl` / `*.val.jsonl` files (each record must have
+   `instruction` / `input` / `output`).
+2. Optionally override the filenames at runtime via the
+   `DATASET_TRAIN_FILE` and `DATASET_VAL_FILE` env vars on the RayJob.
+
+For a deeper change (different prompt template, multi-turn chat format,
+etc.) edit `prepare_dataset()` in `finetune_with_tune.py`.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `setup-aks-raytune-finetune.sh` | AKS cluster setup script |
-| `ray-cluster.finetune.yaml` | Ray cluster configuration |
-| `ray-job.finetune.yaml` | Ray Job for fine-tuning |
+| `setup-aks-raytune-finetune.sh` | AKS cluster setup + dataset PVC bootstrap script |
+| `ray-cluster.finetune.yaml` | Ray cluster configuration (mounts `aks-dataset` PVC at `/home/ray/dataset`) |
+| `ray-job.finetune.yaml` | Ray Job for fine-tuning (inline-pushes the merged model to `chengliangli/qwen2.5-3b-aks-tsg`) |
 | `ray-job.push.yaml` | Ray Job to push an existing checkpoint to the HF Hub |
-| `ray-job.compare.yaml` | Ray Job to compare base vs fine-tuned model |
-| `finetune_with_tune.py` | Fine-tuning script with Tune (inline HF push via `INLINE_PUSH_*` envs) |
+| `ray-job.compare.yaml` | Ray Job to compare base vs fine-tuned model on the AKS val split |
+| `finetune_with_tune.py` | Fine-tuning script with Tune (reads `$DATASET_DIR/aks_combined.{train,val}.jsonl`; inline HF push via `INLINE_PUSH_*` envs) |
 | `push_to_hub.py` | Standalone CLI to merge a LoRA adapter and push to HF Hub |
-| `compare_inference.py` | Compare base vs adapter / merged model on Alpaca prompts |
-| `comparison.json` | Latest comparison summary (committed for reference) |
+| `compare_inference.py` | Compare base vs adapter / merged model on the AKS val split (or any Alpaca-style JSONL via `--eval-file`) |
+| `comparison.json` | Historical comparison run (legacy Alpaca fine-tune, kept for reference) |
 
 ## Results
 
-Fine-tuned `Qwen/Qwen2.5-3B` on `tatsu-lab/alpaca` (10k samples, 1 epoch, LoRA r=16) and pushed the merged model to [`chengliangli/qwen2.5-3b-alpaca`](https://huggingface.co/chengliangli/qwen2.5-3b-alpaca). Comparison on 20 held-out Alpaca prompts:
+Fine-tuned `Qwen/Qwen2.5-3B` on `aks_combined.train.jsonl` (≈12k
+Alpaca-style records covering AKS public docs, AKS TSG, and IcM incident
+summaries) with QLoRA (4-bit) + LoRA, then merged and pushed to
+[`chengliangli/qwen2.5-3b-aks-tsg`](https://huggingface.co/chengliangli/qwen2.5-3b-aks-tsg).
+Evaluation is performed on a held-out slice of
+`aks_combined.val.jsonl` via `ray-job.compare.yaml`.
 
-| Metric | Base (Qwen2.5-3B) | Fine-tuned | Δ |
-|---|---:|---:|---:|
-| Avg perplexity | 3.37 | **2.90** | −0.47 (−14%) |
-| Avg ROUGE-L F1 | 0.298 | **0.383** | +0.085 (+29%) |
-| Avg latency / prompt | 4.86 s | **2.55 s** | −47% |
-| Tokens / sec | 22.9 | 23.1 | ≈same |
-
-The fine-tuned model produces shorter, more on-target responses in the Alpaca instruction style — the latency drop comes from fewer generated tokens (same throughput), not from a faster model. Full raw summary in [comparison.json](./comparison.json).
-
-Example (prompt #20 — _"Edit this sentence to make it sound more professional: 'I can help you out more with this task'"_):
-
-- **Base** (ppl 2.50, ROUGE-L 0.667): _"I can provide you with more assistance regarding this task."_
-- **Fine-tuned** (ppl 1.87, ROUGE-L 0.632): _"I am more than willing to assist you with this task."_
-- **Reference**: _"I can assist you further with this task."_
+> **Note:** The numbers in [comparison.json](./comparison.json) are from the
+> previous Alpaca fine-tune (`chengliangli/qwen2.5-3b-alpaca`) and are kept
+> only as a historical baseline. The new AKS-domain comparison report will
+> be written to `/tmp/comparison.json` on the Ray head pod when
+> `ray-job.compare.yaml` finishes — copy it out with `kubectl cp` if you
+> want to commit it.
 
 To reproduce:
 
 ```bash
-# 1. fine-tune + inline-push merged model to HF (set INLINE_PUSH_REPO_ID in ray-job.finetune.yaml)
+# 1. fine-tune + inline-push merged model to HF
+#    (INLINE_PUSH_REPO_ID=chengliangli/qwen2.5-3b-aks-tsg is set in ray-job.finetune.yaml)
 kubectl apply -f ray-job.finetune.yaml
 
-# 2. compare base vs your fine-tuned model
+# 2. compare base vs your fine-tuned model on the held-out AKS val split
 kubectl apply -f ray-job.compare.yaml
 kubectl logs -f $(kubectl get pod -l job-name=llm-compare-inference -o name | head -1)
 ```

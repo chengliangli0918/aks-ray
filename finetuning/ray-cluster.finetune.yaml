@@ -64,6 +64,8 @@ spec:
             mountPath: /dev/shm
           - name: finetune-script
             mountPath: /home/ray/scripts
+          - name: aks-dataset
+            mountPath: /home/ray/dataset
           - name: ray-logs
             mountPath: /tmp/ray
         volumes:
@@ -74,6 +76,9 @@ spec:
         - name: finetune-script
           configMap:
             name: finetune-script
+        - name: aks-dataset
+          persistentVolumeClaim:
+            claimName: aks-dataset
         - name: ray-logs
           emptyDir: {}
   workerGroupSpecs:
@@ -118,6 +123,8 @@ spec:
             mountPath: /dev/shm
           - name: finetune-script
             mountPath: /home/ray/scripts
+          - name: aks-dataset
+            mountPath: /home/ray/dataset
           - name: model-cache
             mountPath: /root/.cache/huggingface
         volumes:
@@ -128,6 +135,9 @@ spec:
         - name: finetune-script
           configMap:
             name: finetune-script
+        - name: aks-dataset
+          persistentVolumeClaim:
+            claimName: aks-dataset
         - name: model-cache
           emptyDir:
             sizeLimit: 100Gi
