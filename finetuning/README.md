@@ -80,9 +80,9 @@ The sample provides:
    - `aks_combined.val.jsonl` (~1.4k records)
 
    Each record has `instruction` / `input` / `output` fields built from AKS
-   public docs, the AKS TSG, and IcM incident summaries. Point `DATASET_SRC_DIR`
+   public docs and the AKS TSG. Point `DATASET_SRC_DIR`
    at the directory that contains these two files before running the setup
-   script (default: `/home/charlili/go/src/github.com/chengliangli0918/aks-tsg/dataset`).
+   script.
 
 ## Quick Start
 
@@ -190,7 +190,6 @@ etc.) edit `prepare_dataset()` in `finetune_with_tune.py`.
 | `finetune_with_tune.py` | Fine-tuning script with Tune (reads `$DATASET_DIR/aks_combined.{train,val}.jsonl`; inline HF push via `INLINE_PUSH_*` envs) |
 | `push_to_hub.py` | Standalone CLI to merge a LoRA adapter and push to HF Hub |
 | `compare_inference.py` | Compare base vs adapter / merged model on the AKS val split (or any Alpaca-style JSONL via `--eval-file`) |
-| `comparison.json` | Base vs fine-tuned eval on 20 held-out AKS val samples (output of the latest `ray-job.compare.yaml` run) |
 
 ## Fine-tuning Approach
 
@@ -248,14 +247,15 @@ reaches a final `eval_loss` of ~1.64.
 ## Results
 
 Fine-tuned `Qwen/Qwen2.5-3B` on `aks_combined.train.jsonl` (≈12k
-Alpaca-style records covering AKS public docs, AKS TSG, and IcM incident
-summaries) with QLoRA (4-bit) + LoRA, then merged and pushed to
+Alpaca-style records covering AKS public docs and the AKS TSG)
+with QLoRA (4-bit) + LoRA, then merged and pushed to
 [`chengliangli/qwen2.5-3b-aks-tsg`](https://huggingface.co/chengliangli/qwen2.5-3b-aks-tsg)
 (private, 5.67 GB fp16).
 
 Evaluation: 20 held-out samples from `aks_combined.val.jsonl`, generated
-with greedy decoding on the merged fp16 model. Full per-sample data lives
-in [comparison.json](./comparison.json).
+with greedy decoding on the merged fp16 model. Per-sample perplexity /
+ROUGE-L / latency are written to `/tmp/comparison.json` on the Ray head
+pod when `ray-job.compare.yaml` finishes.
 
 | Metric | Base `Qwen2.5-3B` | Fine-tuned `qwen2.5-3b-aks-tsg` | Δ |
 |---|---|---|---|
@@ -287,7 +287,9 @@ HEAD=$(kubectl get pod -l ray.io/node-type=head -o jsonpath='{.items[0].metadata
 SID=$(kubectl get rayjob llm-compare-inference -o jsonpath='{.status.jobId}')
 kubectl exec "$HEAD" -c ray-head -- ray job logs "$SID" | tail -50
 
-# 3. pull the per-sample comparison report out of the head pod
+# 3. (optional) pull the per-sample comparison report out of the head pod
+#    NOTE: if your val split contains internal/sensitive text, do NOT commit
+#    this file — keep it local or scrub it first.
 kubectl cp "$HEAD":/tmp/comparison.json ./comparison.json -c ray-head
 ```
 
