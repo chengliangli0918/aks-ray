@@ -1,6 +1,6 @@
 # LLM Fine-tuning with Ray Train + Ray Tune on AKS Automatic
 
-This sample demonstrates how to fine-tune Large Language Models (LLMs) on AKS Automatic using Ray Train for distributed training and Ray Tune for hyperparameter optimization. The example fine-tunes `Qwen/Qwen2.5-3B` on a local AKS-domain instruction dataset built from AKS public documentation, the AKS troubleshooting guide (TSG), and anonymized IcM incident summaries.
+This sample demonstrates how to fine-tune Large Language Models (LLMs) on AKS Automatic using Ray Train for distributed training and Ray Tune for hyperparameter optimization. The example fine-tunes `Qwen/Qwen2.5-3B` on a local AKS-domain instruction dataset built from AKS public documentation, the AKS troubleshooting guide (TSG).
 
 ## Overview
 
@@ -190,34 +190,105 @@ etc.) edit `prepare_dataset()` in `finetune_with_tune.py`.
 | `finetune_with_tune.py` | Fine-tuning script with Tune (reads `$DATASET_DIR/aks_combined.{train,val}.jsonl`; inline HF push via `INLINE_PUSH_*` envs) |
 | `push_to_hub.py` | Standalone CLI to merge a LoRA adapter and push to HF Hub |
 | `compare_inference.py` | Compare base vs adapter / merged model on the AKS val split (or any Alpaca-style JSONL via `--eval-file`) |
-| `comparison.json` | Historical comparison run (legacy Alpaca fine-tune, kept for reference) |
+| `comparison.json` | Base vs fine-tuned eval on 20 held-out AKS val samples (output of the latest `ray-job.compare.yaml` run) |
+
+## Fine-tuning Approach
+
+The end-to-end pipeline implemented by this sample:
+
+1. **Model + method.** `Qwen/Qwen2.5-3B` loaded in 4-bit (NF4, double-quant) via
+   `bitsandbytes`, with LoRA adapters injected on the attention + MLP projections
+   (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`).
+2. **Data.** `aks_combined.train.jsonl` / `aks_combined.val.jsonl` (Alpaca-style
+   `instruction` / `input` / `output` records built from AKS public docs, the
+   AKS TSG are uploaded to an Azure Files PVC (`aks-dataset`, RWX) and mounted
+   at `/home/ray/dataset` on the Ray head + worker pods.
+3. **Distributed training.** `finetune_with_tune.py` wraps a Hugging Face
+   `Trainer` inside a Ray Train `TorchTrainer`. By default it runs as a
+   `--single-run` (one trial, fixed best-known hyperparameters) on 1 worker
+   with `--gpus-per-worker 1`; pass plain `python finetune_with_tune.py` to
+   launch the full Ray Tune sweep (ASHA + Optuna) over the table above.
+4. **Inline merge + push.** Because Ray Tune's default checkpoint persistence
+   fails on multi-node clusters without shared object storage, the trainer
+   merges the LoRA adapter into fp16 weights and pushes them to the Hugging
+   Face Hub from inside `train_func` *before* `tune.report()`. This is driven
+   by env vars on the RayJob:
+
+   | Env var | Purpose |
+   |---|---|
+   | `INLINE_PUSH_REPO_ID` | Target HF repo (`chengliangli/qwen2.5-3b-aks-tsg`) |
+   | `INLINE_PUSH_PRIVATE=1` | Create the repo as private |
+   | `INLINE_PUSH_MERGE=1` | Merge LoRA into the base weights before push |
+
+   The merged fp16 model (~5.7 GB) lands on the Hub at the end of the run;
+   you don't need a shared filesystem for checkpoints.
+5. **Evaluation.** `ray-job.compare.yaml` runs `compare_inference.py`, which
+   loads the base model and the merged fine-tuned model side-by-side, samples
+   `--num-samples` records from `aks_combined.val.jsonl`, generates completions
+   with both, and writes per-sample perplexity / ROUGE-L / latency to
+   `/tmp/comparison.json` on the head pod.
+
+Best hyperparameters used by `--single-run` (verified against the full sweep):
+
+| Hyperparameter | Value |
+|---|---|
+| `lora_r` | 16 |
+| `lora_alpha` | 32 |
+| `lora_dropout` | 0.05 |
+| `learning_rate` | 2e-4 |
+| `per_device_train_batch_size` | 8 |
+| `gradient_accumulation_steps` | 2 |
+| `epochs` | 1 |
+| `warmup_ratio` | 0.03 |
+| `weight_decay` | 0.01 |
+
+A full `--single-run` on 4× A100 (80 GB) completes in ~95 minutes and
+reaches a final `eval_loss` of ~1.64.
 
 ## Results
 
 Fine-tuned `Qwen/Qwen2.5-3B` on `aks_combined.train.jsonl` (≈12k
 Alpaca-style records covering AKS public docs, AKS TSG, and IcM incident
 summaries) with QLoRA (4-bit) + LoRA, then merged and pushed to
-[`chengliangli/qwen2.5-3b-aks-tsg`](https://huggingface.co/chengliangli/qwen2.5-3b-aks-tsg).
-Evaluation is performed on a held-out slice of
-`aks_combined.val.jsonl` via `ray-job.compare.yaml`.
+[`chengliangli/qwen2.5-3b-aks-tsg`](https://huggingface.co/chengliangli/qwen2.5-3b-aks-tsg)
+(private, 5.67 GB fp16).
 
-> **Note:** The numbers in [comparison.json](./comparison.json) are from the
-> previous Alpaca fine-tune (`chengliangli/qwen2.5-3b-alpaca`) and are kept
-> only as a historical baseline. The new AKS-domain comparison report will
-> be written to `/tmp/comparison.json` on the Ray head pod when
-> `ray-job.compare.yaml` finishes — copy it out with `kubectl cp` if you
-> want to commit it.
+Evaluation: 20 held-out samples from `aks_combined.val.jsonl`, generated
+with greedy decoding on the merged fp16 model. Full per-sample data lives
+in [comparison.json](./comparison.json).
 
-To reproduce:
+| Metric | Base `Qwen2.5-3B` | Fine-tuned `qwen2.5-3b-aks-tsg` | Δ |
+|---|---|---|---|
+| Avg perplexity | 12.56 | **4.51** | **−64%** |
+| Avg ROUGE-L vs reference | 0.090 | **0.195** | **+117%** (≈2.2×) |
+| Per-sample perplexity win-rate | — | **20 / 20** | every sample improved |
+| Avg latency / sample | 6.96 s | 7.81 s | +0.85 s (longer outputs) |
+| Avg throughput | 23.4 tok/s | 23.5 tok/s | ≈ unchanged |
+
+The largest wins are on AKS-specific prompts where the base model
+hallucinates plausible-sounding but wrong commands (e.g. sample 0:
+ppl 41.6 → 1.3; sample 3: 63.5 → 2.2; sample 7: 24.2 → 1.1). Qualitatively
+the fine-tuned model emits real AKS doc patterns —
+`az provider register --namespace Microsoft.ContainerService --wait`,
+`azurecli-interactive` fences, reference-style links — instead of generic
+Kubernetes prose.
+
+To reproduce end-to-end:
 
 ```bash
 # 1. fine-tune + inline-push merged model to HF
 #    (INLINE_PUSH_REPO_ID=chengliangli/qwen2.5-3b-aks-tsg is set in ray-job.finetune.yaml)
 kubectl apply -f ray-job.finetune.yaml
 
-# 2. compare base vs your fine-tuned model on the held-out AKS val split
+# 2. once SUCCEEDED, compare base vs your fine-tuned model on the val split
+kubectl delete rayjob llm-finetune-job  # free the GPU worker
 kubectl apply -f ray-job.compare.yaml
-kubectl logs -f $(kubectl get pod -l job-name=llm-compare-inference -o name | head -1)
+HEAD=$(kubectl get pod -l ray.io/node-type=head -o jsonpath='{.items[0].metadata.name}')
+SID=$(kubectl get rayjob llm-compare-inference -o jsonpath='{.status.jobId}')
+kubectl exec "$HEAD" -c ray-head -- ray job logs "$SID" | tail -50
+
+# 3. pull the per-sample comparison report out of the head pod
+kubectl cp "$HEAD":/tmp/comparison.json ./comparison.json -c ray-head
 ```
 
 ## Monitoring

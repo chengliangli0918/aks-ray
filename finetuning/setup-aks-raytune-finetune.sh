@@ -228,6 +228,23 @@ spec:
   - name: loader
     image: mcr.microsoft.com/cbl-mariner/busybox:2.0
     command: ["sh", "-c", "mkdir -p /data && sleep 3600"]
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+    livenessProbe:
+      exec:
+        command: ["sh", "-c", "test -d /data"]
+      initialDelaySeconds: 5
+      periodSeconds: 30
+    readinessProbe:
+      exec:
+        command: ["sh", "-c", "test -d /data"]
+      initialDelaySeconds: 2
+      periodSeconds: 10
     volumeMounts:
     - name: dataset
       mountPath: /data
